@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ARTIST
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+  OFF
+}
+
+enum AttendanceStatus {
+  NORMAL
+  LEAVE
+  ABSENT
+  PAUSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  passwordHash String
+  role         UserRole @default(CUSTOMER)
+  name         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  artistProfile ArtistProfile?
+  refreshTokens RefreshToken[]
+  bookings      Booking[]        @relation("CustomerBookings")
+  adminLogs     AdminOperationLog[] @relation("AdminLogs")
+}
+
+model ArtistProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  displayName     String
+  bio             String?
+  isActive        Boolean  @default(true)
+  slotDurationMin Int      @default(60)
+  advanceDays     Int      @default(30)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user             User                   @relation(fields: [userId], references: [id])
+  scheduleTemplates WeeklyScheduleTemplate[]
+  timeSlots         ArtistTimeSlot[]
+  bookings          Booking[]              @relation("ArtistBookings")
+  attendanceRecords AttendanceRecord[]
+
+  @@index([isActive])
+}
+
+/// Weekly recurring schedule template (e.g. weekday=1 for Monday).
+/// Times are stored as "HH:mm" in the server's local timezone.
+model WeeklyScheduleTemplate {
+  id        String   @id @default(cuid())
+  artistId  String
+  weekday   Int
+  startTime String
+  endTime   String
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  artist ArtistProfile @relation(fields: [artistId], references: [id])
+
+  @@index([artistId, weekday])
+}
+
+model ArtistTimeSlot {
+  id        String     @id @default(cuid())
+  artistId  String
+  startAt   DateTime
+  endAt     DateTime
+  status    SlotStatus @default(AVAILABLE)
+  source    String?
+  note      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  artist  ArtistProfile @relation(fields: [artistId], references: [id])
+  booking Booking?
+
+  @@unique([artistId, startAt, endAt])
+  @@index([artistId, startAt, status])
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  customerId   String
+  artistId     String
+  slotId       String?       @unique
+  slotStartAt  DateTime
+  slotEndAt    DateTime
+  status       BookingStatus @default(PENDING)
+  contactName  String
+  contactPhone String?
+  requestNote  String?
+  adminNote    String?
+  cancelledAt  DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  customer User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  artist   ArtistProfile @relation("ArtistBookings", fields: [artistId], references: [id])
+  slot     ArtistTimeSlot? @relation(fields: [slotId], references: [id])
+
+  @@index([customerId, createdAt])
+  @@index([artistId, createdAt])
+  @@index([status])
+}
+
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  artistId  String
+  workDate  DateTime
+  status    AttendanceStatus
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  artist ArtistProfile @relation(fields: [artistId], references: [id])
+
+  @@unique([artistId, workDate])
+  @@index([artistId, workDate])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model AdminOperationLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  action      String
+  targetType  String
+  targetId    String
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  adminUser User @relation("AdminLogs", fields: [adminUserId], references: [id])
+
+  @@index([adminUserId, createdAt])
+  @@index([targetType, targetId])
+}

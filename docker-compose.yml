@@ -1,0 +1,19 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: brushslot-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: brushslot
+      MYSQL_USER: brushslot
+      MYSQL_PASSWORD: brushslot
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
+

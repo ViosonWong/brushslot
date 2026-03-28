@@ -1,0 +1,10 @@
+packages:
+  - "web"
+  - "api"
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/engines': true
+  '@scarf/scarf': true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
